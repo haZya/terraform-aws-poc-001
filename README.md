@@ -96,7 +96,7 @@ Finally, replace `000000000000` with the real state account ID in your local dev
 envs/dev/backend.hcl
 ```
 
-Staging and production backend settings are injected by GitHub Actions so state bucket names and account IDs do not need to be committed.
+Staging and production backend files contain placeholder values only. GitHub Actions overrides them at `terraform init`, so state bucket names and account IDs do not need to be committed.
 
 ## Local Profiles
 
