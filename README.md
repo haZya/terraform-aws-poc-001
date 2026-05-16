@@ -186,7 +186,7 @@ poc-001/staging/<region>/terraform.tfstate
 poc-001/prod/<region>/terraform.tfstate
 ```
 
-Pushes to `main` deploy staging first, then queue production behind the built-in `production` GitHub Environment required-reviewer gate. Production deploys all resolved regions in one approved job.
+Pushes to `main` deploy staging first, then queue production behind the built-in `production` GitHub Environment required-reviewer gate. Production deploys all resolved regions in one approved job. After production succeeds, staging is destroyed automatically for the same resolved regions.
 
 Manual workflow runs can override the region to deploy only one region. Normal pushes deploy all regions from `AWS_REGIONS_JSON`, or the single `AWS_REGION` value, or `ap-southeast-2` if neither is set.
 

@@ -86,7 +86,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check GitHub variables
         run: |
@@ -110,13 +110,15 @@ jobs:
           exit "$missing"
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ${{ matrix.region }}
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          allowed-account-ids: ${{ env.TF_VAR_aws_account_id }}
+          output-env-credentials: true
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: 1.15.0
 
@@ -169,7 +171,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check GitHub variables
         run: |
@@ -193,13 +195,15 @@ jobs:
           exit "$missing"
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ${{ env.TF_STATE_REGION }}
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          allowed-account-ids: ${{ env.TF_VAR_aws_account_id }}
+          output-env-credentials: true
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: 1.15.0
 
@@ -235,7 +239,7 @@ jobs:
     needs:
       - resolve-regions
       - deploy-prod
-    if: always() && github.event_name == 'workflow_dispatch' && (inputs.action == 'destroy-staging' || (inputs.action == 'promote-prod' && inputs.destroy_staging_after_prod == true && needs.deploy-prod.result == 'success'))
+    if: always() && ((github.event_name == 'push' && needs.deploy-prod.result == 'success') || (github.event_name == 'workflow_dispatch' && (inputs.action == 'destroy-staging' || (inputs.action == 'promote-prod' && inputs.destroy_staging_after_prod == true && needs.deploy-prod.result == 'success'))))
     environment: staging
     strategy:
       fail-fast: false
@@ -258,7 +262,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check GitHub variables
         run: |
@@ -282,13 +286,15 @@ jobs:
           exit "$missing"
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ${{ matrix.region }}
           role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          allowed-account-ids: ${{ env.TF_VAR_aws_account_id }}
+          output-env-credentials: true
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: 1.15.0
 
