@@ -1,0 +1,238 @@
+name: Terraform
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Deployment action.
+        type: choice
+        options:
+          - deploy-staging
+          - promote-prod
+          - destroy-staging
+        default: deploy-staging
+      destroy_staging_after_prod:
+        description: Destroy staging after a successful prod promotion.
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  TF_INPUT: false
+  TF_IN_AUTOMATION: true
+  AWS_REGION: ap-southeast-2
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        working-directory:
+          - bootstrap/state
+          - bootstrap/accounts/staging
+          - bootstrap/accounts/prod
+          - envs/dev
+          - envs/staging
+          - envs/prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.0
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: ${{ matrix.working-directory }}
+        run: terraform init -backend=false
+
+      - name: Terraform validate
+        working-directory: ${{ matrix.working-directory }}
+        run: terraform validate
+
+  deploy-staging:
+    name: Deploy Staging
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || inputs.action == 'deploy-staging'
+    environment: staging
+    concurrency:
+      group: terraform-staging
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_WORKING_DIR: envs/staging
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check GitHub environment variables
+        run: |
+          missing=0
+
+          if [ -z "$AWS_ROLE_ARN" ]; then
+            echo "::error::Set AWS_ROLE_ARN on the staging GitHub environment."
+            missing=1
+          fi
+
+          exit "$missing"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.0
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Terraform validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+
+      - name: Terraform plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform plan -out=tfplan
+
+      - name: Terraform apply
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -auto-approve tfplan
+
+  deploy-prod:
+    name: Promote Prod
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'promote-prod'
+    environment: production
+    concurrency:
+      group: terraform-prod
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_WORKING_DIR: envs/prod
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check GitHub environment variables
+        run: |
+          missing=0
+
+          if [ -z "$AWS_ROLE_ARN" ]; then
+            echo "::error::Set AWS_ROLE_ARN on the production GitHub environment."
+            missing=1
+          fi
+
+          exit "$missing"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.0
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Terraform validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+
+      - name: Terraform plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform plan -out=tfplan
+
+      - name: Terraform apply
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -auto-approve tfplan
+
+  destroy-staging:
+    name: Destroy Staging
+    runs-on: ubuntu-latest
+    needs:
+      - deploy-prod
+    if: always() && github.event_name == 'workflow_dispatch' && (inputs.action == 'destroy-staging' || (inputs.action == 'promote-prod' && inputs.destroy_staging_after_prod == true && needs.deploy-prod.result == 'success'))
+    environment: staging
+    concurrency:
+      group: terraform-staging
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_WORKING_DIR: envs/staging
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check GitHub environment variables
+        run: |
+          missing=0
+
+          if [ -z "$AWS_ROLE_ARN" ]; then
+            echo "::error::Set AWS_ROLE_ARN on the staging GitHub environment."
+            missing=1
+          fi
+
+          exit "$missing"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.0
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init
+
+      - name: Terraform destroy
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform destroy -auto-approve
