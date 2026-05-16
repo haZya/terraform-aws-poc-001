@@ -123,20 +123,15 @@ jobs:
       - name: Terraform fmt
         run: terraform fmt -check -recursive
 
-      - name: Write backend config
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: |
-          printf '%s\n' \
-            "bucket       = \"${TF_STATE_BUCKET}\"" \
-            "key          = \"${TF_STATE_KEY}\"" \
-            "region       = \"${TF_STATE_REGION}\"" \
-            "encrypt      = true" \
-            "use_lockfile = true" \
-            > backend.hcl
-
       - name: Terraform init
         working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform init -backend-config=backend.hcl -reconfigure
+        run: |
+          terraform init -reconfigure \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${TF_STATE_REGION}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
 
       - name: Terraform validate
         working-directory: ${{ env.TF_WORKING_DIR }}
@@ -215,20 +210,15 @@ jobs:
       - name: Terraform fmt
         run: terraform fmt -check -recursive
 
-      - name: Write backend config
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: |
-          printf '%s\n' \
-            "bucket       = \"${TF_STATE_BUCKET}\"" \
-            "key          = \"${TF_STATE_KEY}\"" \
-            "region       = \"${TF_STATE_REGION}\"" \
-            "encrypt      = true" \
-            "use_lockfile = true" \
-            > backend.hcl
-
       - name: Terraform init
         working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform init -backend-config=backend.hcl -reconfigure
+        run: |
+          terraform init -reconfigure \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${TF_STATE_REGION}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
 
       - name: Terraform validate
         working-directory: ${{ env.TF_WORKING_DIR }}
@@ -305,20 +295,15 @@ jobs:
         with:
           terraform_version: 1.15.0
 
-      - name: Write backend config
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        run: |
-          printf '%s\n' \
-            "bucket       = \"${TF_STATE_BUCKET}\"" \
-            "key          = \"${TF_STATE_KEY}\"" \
-            "region       = \"${TF_STATE_REGION}\"" \
-            "encrypt      = true" \
-            "use_lockfile = true" \
-            > backend.hcl
-
       - name: Terraform init
         working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform init -backend-config=backend.hcl -reconfigure
+        run: |
+          terraform init -reconfigure \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${TF_STATE_REGION}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
 
       - name: Terraform destroy
         working-directory: ${{ env.TF_WORKING_DIR }}

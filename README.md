@@ -188,7 +188,7 @@ poc-001/prod/<region>/terraform.tfstate
 
 Manual workflow runs can override the region to deploy only one region. Pushes to `main` deploy all regions from `AWS_REGIONS_JSON`, or the single `AWS_REGION` value, or `ap-southeast-2` if neither is set.
 
-The deploy workflow generates `backend.hcl` at runtime and runs `terraform init -backend-config=backend.hcl`, so state bucket names and account IDs are not committed.
+The deploy workflow passes backend config to `terraform init` at runtime, so state bucket names and account IDs are not committed.
 
 Pull request checks run in a separate workflow, `.github/workflows/terraform-checks.yml`, and deployment runs in `.github/workflows/terraform-deploy.yml`.
 
