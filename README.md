@@ -163,10 +163,19 @@ AWS_ROLE_ARN
 Set these repository variables when they are shared across environments:
 
 ```text
+AWS_REGIONS_JSON
 AWS_REGION
 TF_STATE_BUCKET
 TF_STATE_REGION
 ```
+
+Use `AWS_REGIONS_JSON` for multi-region deployment, for example:
+
+```json
+["ap-southeast-2", "us-east-1"]
+```
+
+If `AWS_REGIONS_JSON` is unset, the deploy workflow uses `AWS_REGION`. If both are unset, it falls back to `ap-southeast-2`.
 
 Use the role ARN output from the matching bootstrap account root. `AWS_ACCOUNT_ID` is passed to Terraform as `TF_VAR_aws_account_id`, and `TF_STATE_BUCKET` is passed to `terraform init` as backend config.
 
@@ -177,7 +186,11 @@ poc-001/staging/<region>/terraform.tfstate
 poc-001/prod/<region>/terraform.tfstate
 ```
 
-Manual workflow runs can override the region. Pushes to `main` use the repository `AWS_REGION` variable, or `ap-southeast-2` if unset.
+Manual workflow runs can override the region to deploy only one region. Pushes to `main` deploy all regions from `AWS_REGIONS_JSON`, or the single `AWS_REGION` value, or `ap-southeast-2` if neither is set.
+
+The deploy workflow generates `backend.hcl` at runtime and runs `terraform init -backend-config=backend.hcl`, so state bucket names and account IDs are not committed.
+
+Pull request checks run in a separate workflow, `.github/workflows/terraform-checks.yml`, and deployment runs in `.github/workflows/terraform-deploy.yml`.
 
 Staging and production example values are committed without real account IDs:
 

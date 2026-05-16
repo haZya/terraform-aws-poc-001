@@ -1,0 +1,48 @@
+name: Terraform Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  TF_INPUT: false
+  TF_IN_AUTOMATION: true
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        working-directory:
+          - bootstrap/state
+          - bootstrap/accounts/staging
+          - bootstrap/accounts/prod
+          - envs/dev
+          - envs/staging
+          - envs/prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.15.0
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: ${{ matrix.working-directory }}
+        run: terraform init -backend=false
+
+      - name: Terraform validate
+        working-directory: ${{ matrix.working-directory }}
+        run: terraform validate
