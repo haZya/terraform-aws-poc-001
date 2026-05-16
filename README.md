@@ -196,6 +196,8 @@ Pull request checks run in a separate workflow, `.github/workflows/terraform-che
 
 Pull requests from branches in this repository also run staging plans across the configured regions. Pull requests from forks run validation only, so AWS OIDC credentials are not exposed to untrusted fork workflows.
 
+Production destroy is intentionally separated into `.github/workflows/terraform-destroy-prod.yml`. It only runs manually, requires typing `destroy production`, and uses the `production` GitHub Environment required-reviewer gate.
+
 Staging and production example values are committed without real account IDs:
 
 ```text
