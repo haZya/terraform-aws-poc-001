@@ -1,15 +1,23 @@
 region         = "ap-southeast-2"
-profile        = "bootstrap-account"
+profile        = "state-account"
 aws_account_id = "000000000000"
 app_name       = "poc-001"
 
 # Optional. If omitted, bootstrap uses "${app_name}-terraform-state-${current_account_id}".
 # state_bucket_name = "poc-001-terraform-state-000000000000"
 
-# Add deployment role ARNs from bootstrap/accounts/* before the first state apply.
-# Add any local dev role/user principals that need cross-account state bucket access.
-# trusted_state_principal_arns = [
-#   "arn:aws:iam::111111111111:role/dev-admin",
-#   "arn:aws:iam::222222222222:role/poc-001-staging-github-actions",
-#   "arn:aws:iam::333333333333:role/poc-001-production-github-actions",
+# Add deployment principals and restrict each one to its own state prefix.
+# trusted_state_access = [
+#   {
+#     principal_arns = ["arn:aws:iam::111111111111:root"]
+#     key_prefix     = "poc-001/dev/111111111111"
+#   },
+#   {
+#     principal_arns = ["arn:aws:iam::222222222222:role/poc-001-staging-github-actions"]
+#     key_prefix     = "poc-001/staging"
+#   },
+#   {
+#     principal_arns = ["arn:aws:iam::333333333333:role/poc-001-production-github-actions"]
+#     key_prefix     = "poc-001/prod"
+#   },
 # ]

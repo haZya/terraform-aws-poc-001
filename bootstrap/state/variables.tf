@@ -42,8 +42,11 @@ variable "force_destroy_state_bucket" {
   default     = false
 }
 
-variable "trusted_state_principal_arns" {
-  description = "IAM principal ARNs allowed to access this state bucket from other AWS accounts."
-  type        = list(string)
-  default     = []
+variable "trusted_state_access" {
+  description = "IAM principals and state key prefixes allowed to access this state bucket."
+  type = list(object({
+    principal_arns = list(string)
+    key_prefix     = string
+  }))
+  default = []
 }

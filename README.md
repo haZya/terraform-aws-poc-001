@@ -68,7 +68,9 @@ terraform -chdir=bootstrap/accounts/prod apply
 terraform -chdir=bootstrap/accounts/prod output github_actions_role_arn
 ```
 
-Then create the shared state bucket and bucket policy. Add the role ARNs from the account bootstrap outputs to `trusted_state_principal_arns` before the first apply.
+Then create the shared state bucket and bucket policy. Add the dev account principal and the GitHub role ARNs from the account bootstrap outputs to `trusted_state_access` before the first apply.
+
+Each entry is scoped to one state key prefix. This lets the dev account access only `poc-001/dev/<dev-account-id>/*`, while staging and prod can access only their own prefixes.
 
 PowerShell:
 
@@ -88,13 +90,13 @@ terraform -chdir=bootstrap/state apply
 terraform -chdir=bootstrap/state output state_bucket_name
 ```
 
-Finally, replace `000000000000` with the real state account ID in:
+Finally, replace `000000000000` with the real state account ID in your local dev backend config:
 
 ```text
 envs/dev/backend.hcl
-envs/staging/backend.tf
-envs/prod/backend.tf
 ```
+
+Staging and production backend settings are injected by GitHub Actions so state bucket names and account IDs do not need to be committed.
 
 ## Local Profiles
 
@@ -108,7 +110,7 @@ profile        = "dev"
 aws_account_id = "111111111111"
 ```
 
-For the S3 backend, also set the profile in local `envs/dev/backend.hcl`:
+The S3 backend does not inherit the provider's `profile = "dev"`, so set `profile = "dev"` in local `envs/dev/backend.hcl` too:
 
 ```hcl
 bucket       = "poc-001-terraform-state-000000000000"
@@ -126,7 +128,7 @@ PowerShell:
 ```powershell
 Copy-Item envs/dev/terraform.tfvars.example envs/dev/terraform.tfvars
 Copy-Item envs/dev/backend.hcl.example envs/dev/backend.hcl
-terraform -chdir=envs/dev init -backend-config=backend.hcl
+terraform -chdir=envs/dev init -backend-config backend.hcl
 terraform -chdir=envs/dev apply
 ```
 
@@ -135,7 +137,7 @@ sh/bash/zsh:
 ```sh
 cp envs/dev/terraform.tfvars.example envs/dev/terraform.tfvars
 cp envs/dev/backend.hcl.example envs/dev/backend.hcl
-terraform -chdir=envs/dev init -backend-config=backend.hcl
+terraform -chdir=envs/dev init -backend-config backend.hcl
 terraform -chdir=envs/dev apply
 ```
 
@@ -154,16 +156,25 @@ Create GitHub environments named `staging` and `production`.
 Set this environment variable on each one:
 
 ```text
+AWS_ACCOUNT_ID
 AWS_ROLE_ARN
+TF_STATE_BUCKET
 ```
 
-Use the role ARN output from the matching bootstrap account root.
-
-Staging and production Terraform values are committed in:
+Optional environment variables:
 
 ```text
-envs/staging/terraform.tfvars
-envs/prod/terraform.tfvars
+AWS_REGION
+TF_STATE_REGION
+```
+
+Use the role ARN output from the matching bootstrap account root. `AWS_ACCOUNT_ID` is passed to Terraform as `TF_VAR_aws_account_id`, and `TF_STATE_BUCKET` is passed to `terraform init` as backend config.
+
+Staging and production example values are committed without real account IDs:
+
+```text
+envs/staging/terraform.tfvars.example
+envs/prod/terraform.tfvars.example
 ```
 
 The state bucket can be the same bucket for all environments. If that bucket is in a separate AWS account, the bucket policy must trust the GitHub deployment roles that need to read/write Terraform state.

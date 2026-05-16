@@ -50,9 +50,16 @@ data "aws_iam_policy_document" "github_actions" {
   }
 
   statement {
-    sid = "UseTerraformStateBucket"
+    sid = "GetTerraformStateBucketLocation"
     actions = [
       "s3:GetBucketLocation",
+    ]
+    resources = ["arn:aws:s3:::${var.state_bucket_name}"]
+  }
+
+  statement {
+    sid = "ListTerraformStateBucketPrefix"
+    actions = [
       "s3:ListBucket",
     ]
     resources = ["arn:aws:s3:::${var.state_bucket_name}"]
