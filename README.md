@@ -70,7 +70,7 @@ terraform -chdir=bootstrap/accounts/prod output github_actions_role_arn
 
 Then create the shared state bucket and bucket policy. Add the dev account principal and the GitHub role ARNs from the account bootstrap outputs to `trusted_state_access` before the first apply.
 
-Each entry is scoped to one state key prefix. This lets the dev account access only `poc-001/dev/<dev-account-id>/*`, while staging and prod can access only their own prefixes.
+Each entry is scoped to one state key prefix. This lets the dev account access only `poc-001/dev/<dev-account-id>/*`, while staging and prod can access only their own prefixes. Region-specific state keys live under those prefixes.
 
 PowerShell:
 
@@ -114,7 +114,7 @@ The S3 backend does not inherit the provider's `profile = "dev"`, so set `profil
 
 ```hcl
 bucket       = "poc-001-terraform-state-000000000000"
-key          = "poc-001/dev/111111111111/terraform.tfstate"
+key          = "poc-001/dev/111111111111/ap-southeast-2/terraform.tfstate"
 region       = "ap-southeast-2"
 profile      = "dev"
 encrypt      = true
@@ -144,31 +144,40 @@ terraform -chdir=envs/dev apply
 For local dev, use the dev account ID in the state key:
 
 ```hcl
-key = "poc-001/dev/111111111111/terraform.tfstate"
+key = "poc-001/dev/111111111111/ap-southeast-2/terraform.tfstate"
 ```
 
-The account ID keeps each developer's dev state separate while still using the same central state bucket.
+The account ID keeps each developer's dev state separate while still using the same central state bucket. The region segment keeps each regional deployment in separate state.
 
 ## GitHub Environments
 
 Create GitHub environments named `staging` and `production`.
 
-Set this environment variable on each one:
+Set these GitHub Environment variables on `staging` and `production`:
 
 ```text
 AWS_ACCOUNT_ID
 AWS_ROLE_ARN
-TF_STATE_BUCKET
 ```
 
-Optional environment variables:
+Set these repository variables when they are shared across environments:
 
 ```text
 AWS_REGION
+TF_STATE_BUCKET
 TF_STATE_REGION
 ```
 
 Use the role ARN output from the matching bootstrap account root. `AWS_ACCOUNT_ID` is passed to Terraform as `TF_VAR_aws_account_id`, and `TF_STATE_BUCKET` is passed to `terraform init` as backend config.
+
+Staging and production state keys are region-aware:
+
+```text
+poc-001/staging/<region>/terraform.tfstate
+poc-001/prod/<region>/terraform.tfstate
+```
+
+Manual workflow runs can override the region. Pushes to `main` use the repository `AWS_REGION` variable, or `ap-southeast-2` if unset.
 
 Staging and production example values are committed without real account IDs:
 

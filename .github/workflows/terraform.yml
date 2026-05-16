@@ -21,6 +21,9 @@ on:
         description: Destroy staging after a successful prod promotion.
         type: boolean
         default: false
+      region:
+        description: Optional AWS region override. Defaults to the AWS_REGION repository variable.
+        type: string
 
 permissions:
   contents: read
@@ -28,7 +31,6 @@ permissions:
 env:
   TF_INPUT: false
   TF_IN_AUTOMATION: true
-  AWS_REGION: ap-southeast-2
 
 jobs:
   validate:
@@ -72,7 +74,7 @@ jobs:
     if: github.event_name == 'push' || inputs.action == 'deploy-staging'
     environment: staging
     concurrency:
-      group: terraform-staging
+      group: terraform-staging-${{ github.event_name == 'workflow_dispatch' && inputs.region || vars.AWS_REGION || 'ap-southeast-2' }}
       cancel-in-progress: false
     permissions:
       contents: read
@@ -80,10 +82,10 @@ jobs:
     env:
       TF_WORKING_DIR: envs/staging
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-      TF_STATE_KEY: poc-001/staging/terraform.tfstate
+      TF_STATE_KEY: poc-001/staging/${{ github.event_name == 'workflow_dispatch' && inputs.region || vars.AWS_REGION || 'ap-southeast-2' }}/terraform.tfstate
       TF_STATE_REGION: ${{ vars.TF_STATE_REGION || vars.AWS_REGION || 'ap-southeast-2' }}
       TF_VAR_aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
-      TF_VAR_region: ${{ vars.AWS_REGION || 'ap-southeast-2' }}
+      TF_VAR_region: ${{ github.event_name == 'workflow_dispatch' && inputs.region || vars.AWS_REGION || 'ap-southeast-2' }}
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
 
     steps:
@@ -151,7 +153,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.action == 'promote-prod'
     environment: production
     concurrency:
-      group: terraform-prod
+      group: terraform-prod-${{ inputs.region || vars.AWS_REGION || 'ap-southeast-2' }}
       cancel-in-progress: false
     permissions:
       contents: read
@@ -159,10 +161,10 @@ jobs:
     env:
       TF_WORKING_DIR: envs/prod
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-      TF_STATE_KEY: poc-001/prod/terraform.tfstate
+      TF_STATE_KEY: poc-001/prod/${{ inputs.region || vars.AWS_REGION || 'ap-southeast-2' }}/terraform.tfstate
       TF_STATE_REGION: ${{ vars.TF_STATE_REGION || vars.AWS_REGION || 'ap-southeast-2' }}
       TF_VAR_aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
-      TF_VAR_region: ${{ vars.AWS_REGION || 'ap-southeast-2' }}
+      TF_VAR_region: ${{ inputs.region || vars.AWS_REGION || 'ap-southeast-2' }}
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
 
     steps:
@@ -232,7 +234,7 @@ jobs:
     if: always() && github.event_name == 'workflow_dispatch' && (inputs.action == 'destroy-staging' || (inputs.action == 'promote-prod' && inputs.destroy_staging_after_prod == true && needs.deploy-prod.result == 'success'))
     environment: staging
     concurrency:
-      group: terraform-staging
+      group: terraform-staging-${{ inputs.region || vars.AWS_REGION || 'ap-southeast-2' }}
       cancel-in-progress: false
     permissions:
       contents: read
@@ -240,10 +242,10 @@ jobs:
     env:
       TF_WORKING_DIR: envs/staging
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-      TF_STATE_KEY: poc-001/staging/terraform.tfstate
+      TF_STATE_KEY: poc-001/staging/${{ inputs.region || vars.AWS_REGION || 'ap-southeast-2' }}/terraform.tfstate
       TF_STATE_REGION: ${{ vars.TF_STATE_REGION || vars.AWS_REGION || 'ap-southeast-2' }}
       TF_VAR_aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
-      TF_VAR_region: ${{ vars.AWS_REGION || 'ap-southeast-2' }}
+      TF_VAR_region: ${{ inputs.region || vars.AWS_REGION || 'ap-southeast-2' }}
       AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
 
     steps:
