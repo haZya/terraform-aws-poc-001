@@ -126,12 +126,10 @@ jobs:
       - name: Terraform init
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          terraform init -reconfigure \
+          terraform init \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
             -backend-config="key=${TF_STATE_KEY}" \
-            -backend-config="region=${TF_STATE_REGION}" \
-            -backend-config="encrypt=true" \
-            -backend-config="use_lockfile=true"
+            -backend-config="region=${TF_STATE_REGION}"
 
       - name: Terraform validate
         working-directory: ${{ env.TF_WORKING_DIR }}
@@ -213,12 +211,10 @@ jobs:
       - name: Terraform init
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          terraform init -reconfigure \
+          terraform init \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
             -backend-config="key=${TF_STATE_KEY}" \
-            -backend-config="region=${TF_STATE_REGION}" \
-            -backend-config="encrypt=true" \
-            -backend-config="use_lockfile=true"
+            -backend-config="region=${TF_STATE_REGION}"
 
       - name: Terraform validate
         working-directory: ${{ env.TF_WORKING_DIR }}
@@ -298,12 +294,10 @@ jobs:
       - name: Terraform init
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          terraform init -reconfigure \
+          terraform init \
             -backend-config="bucket=${TF_STATE_BUCKET}" \
             -backend-config="key=${TF_STATE_KEY}" \
-            -backend-config="region=${TF_STATE_REGION}" \
-            -backend-config="encrypt=true" \
-            -backend-config="use_lockfile=true"
+            -backend-config="region=${TF_STATE_REGION}"
 
       - name: Terraform destroy
         working-directory: ${{ env.TF_WORKING_DIR }}
