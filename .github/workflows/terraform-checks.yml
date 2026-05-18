@@ -23,9 +23,12 @@ jobs:
           - bootstrap/state
           - bootstrap/accounts/staging
           - bootstrap/accounts/prod
-          - envs/dev
-          - envs/staging
-          - envs/prod
+          - envs/dev/global
+          - envs/dev/regional
+          - envs/staging/global
+          - envs/staging/regional
+          - envs/prod/global
+          - envs/prod/regional
 
     steps:
       - name: Checkout
@@ -72,8 +75,79 @@ jobs:
           echo "Resolved regions: $regions"
           echo "regions=$regions" >> "$GITHUB_OUTPUT"
 
-  plan-staging:
-    name: Plan Staging (${{ matrix.region }})
+  plan-staging-global:
+    name: Plan Staging Global
+    runs-on: ubuntu-latest
+    needs:
+      - validate
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_WORKING_DIR: envs/staging/global
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_STATE_KEY: poc-001/staging/global/terraform.tfstate
+      TF_STATE_REGION: ${{ vars.TF_STATE_REGION || vars.AWS_REGION || 'ap-southeast-2' }}
+      TF_VAR_aws_account_id: ${{ vars.AWS_ACCOUNT_ID }}
+      TF_VAR_region: ${{ vars.TF_GLOBAL_REGION || vars.TF_STATE_REGION || vars.AWS_REGION || 'ap-southeast-2' }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Check GitHub variables
+        run: |
+          missing=0
+
+          if [ -z "$AWS_ROLE_ARN" ]; then
+            echo "::error::Set AWS_ROLE_ARN on the staging GitHub environment."
+            missing=1
+          fi
+
+          if [ -z "$TF_STATE_BUCKET" ]; then
+            echo "::error::Set TF_STATE_BUCKET as a repository variable or on the staging GitHub environment."
+            missing=1
+          fi
+
+          if [ -z "$TF_VAR_aws_account_id" ]; then
+            echo "::error::Set AWS_ACCOUNT_ID on the staging GitHub environment."
+            missing=1
+          fi
+
+          exit "$missing"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: ${{ env.TF_VAR_region }}
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          allowed-account-ids: ${{ env.TF_VAR_aws_account_id }}
+          output-env-credentials: true
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.15.0
+
+      - name: Terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform init -reconfigure \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=${TF_STATE_KEY}" \
+            -backend-config="region=${TF_STATE_REGION}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
+
+      - name: Terraform plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform plan -lock=false -no-color
+
+  plan-staging-regional:
+    name: Plan Staging Regional (${{ matrix.region }})
     runs-on: ubuntu-latest
     needs:
       - validate
@@ -88,7 +162,7 @@ jobs:
       contents: read
       id-token: write
     env:
-      TF_WORKING_DIR: envs/staging
+      TF_WORKING_DIR: envs/staging/regional
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
       TF_STATE_KEY: poc-001/staging/${{ matrix.region }}/terraform.tfstate
       TF_STATE_REGION: ${{ vars.TF_STATE_REGION || vars.AWS_REGION || matrix.region }}

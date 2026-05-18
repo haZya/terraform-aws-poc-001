@@ -7,6 +7,8 @@ provider "aws" {
     tags = {
       App         = local.app_name
       Environment = local.environment
+      Region      = var.region
+      Scope       = "global"
       ManagedBy   = "terraform"
     }
   }

@@ -1,18 +1,29 @@
 # PoC-001 Terraform
 
-This repo uses separate Terraform root modules per environment and a shared `modules/app` module.
+This repo uses separate Terraform root modules per environment, split into global/shared and regional stacks.
 
 ```text
 bootstrap/
-  state/                 # local-state setup for the shared Terraform state bucket
-  accounts/staging/      # local-state setup for the staging GitHub Actions role
-  accounts/prod/         # local-state setup for the production GitHub Actions role
-  modules/               # bootstrap-only reusable modules
-envs/dev/                # local CLI testing against a personal dev AWS account
-envs/staging/            # GitHub-deployed staging environment
-envs/prod/               # GitHub-deployed production environment
-modules/app/             # reusable app infrastructure
+  state/                    # local-state setup for the shared Terraform state bucket
+  accounts/staging/         # local-state setup for the staging GitHub Actions role
+  accounts/prod/            # local-state setup for the production GitHub Actions role
+  modules/                  # bootstrap-only reusable modules
+envs/dev/global/            # local CLI testing for dev shared/global resources
+envs/dev/regional/          # local CLI testing for dev regional app resources
+envs/staging/global/        # GitHub-deployed staging shared/global resources
+envs/staging/regional/      # GitHub-deployed staging regional app resources
+envs/prod/global/           # GitHub-deployed production shared/global resources
+envs/prod/regional/         # GitHub-deployed production regional app resources
+modules/app/                # reusable regional app infrastructure
 ```
+
+## Stack Boundaries
+
+Put resources that are deployed once per environment in `global/`. Examples: IAM, Route 53 zones, CloudFront, Global Accelerator, shared KMS keys, or anything that should not be recreated once per region.
+
+Put resources that are deployed once per region in `regional/`.
+
+Global and regional stacks use separate state files. Deploy global first when regional resources depend on shared resources. Destroy regional first, then global.
 
 ## Bootstrap Order
 
@@ -70,7 +81,7 @@ terraform -chdir=bootstrap/accounts/prod output github_actions_role_arn
 
 Then create the shared state bucket and bucket policy. Add the dev account principal and the GitHub role ARNs from the account bootstrap outputs to `trusted_state_access` before the first apply.
 
-Each entry is scoped to one state key prefix. This lets the dev account access only `poc-001/dev/<dev-account-id>/*`, while staging and prod can access only their own prefixes. Region-specific state keys live under those prefixes.
+Each entry is scoped to one state key prefix. This lets the dev account access only `poc-001/dev/<dev-account-id>/*`, while staging and prod can access only their own prefixes. Global and region-specific state keys live under those prefixes.
 
 PowerShell:
 
@@ -90,10 +101,11 @@ terraform -chdir=bootstrap/state apply
 terraform -chdir=bootstrap/state output state_bucket_name
 ```
 
-Finally, replace `000000000000` with the real state account ID in your local dev backend config:
+Finally, replace `000000000000` with the real state account ID in your local dev backend configs:
 
 ```text
-envs/dev/backend.hcl
+envs/dev/global/backend.hcl
+envs/dev/regional/backend.hcl
 ```
 
 Staging and production backend files contain placeholder values only. GitHub Actions overrides them at `terraform init`, so state bucket names and account IDs do not need to be committed.
@@ -110,7 +122,7 @@ profile        = "dev"
 aws_account_id = "111111111111"
 ```
 
-The S3 backend does not inherit the provider's `profile = "dev"`, so set `profile = "dev"` in local `envs/dev/backend.hcl` too:
+The S3 backend does not inherit the provider's `profile = "dev"`, so set `profile = "dev"` in each local backend config too:
 
 ```hcl
 bucket       = "poc-001-terraform-state-000000000000"
@@ -123,22 +135,34 @@ use_lockfile = true
 
 ## Local Dev
 
+Deploy the global stack first, then the regional stack.
+
 PowerShell:
 
 ```powershell
-Copy-Item envs/dev/terraform.tfvars.example envs/dev/terraform.tfvars
-Copy-Item envs/dev/backend.hcl.example envs/dev/backend.hcl
-terraform -chdir=envs/dev init -backend-config backend.hcl
-terraform -chdir=envs/dev apply
+Copy-Item envs/dev/global/terraform.tfvars.example envs/dev/global/terraform.tfvars
+Copy-Item envs/dev/global/backend.hcl.example envs/dev/global/backend.hcl
+terraform -chdir=envs/dev/global init -backend-config backend.hcl
+terraform -chdir=envs/dev/global apply
+
+Copy-Item envs/dev/regional/terraform.tfvars.example envs/dev/regional/terraform.tfvars
+Copy-Item envs/dev/regional/backend.hcl.example envs/dev/regional/backend.hcl
+terraform -chdir=envs/dev/regional init -backend-config backend.hcl
+terraform -chdir=envs/dev/regional apply
 ```
 
 sh/bash/zsh:
 
 ```sh
-cp envs/dev/terraform.tfvars.example envs/dev/terraform.tfvars
-cp envs/dev/backend.hcl.example envs/dev/backend.hcl
-terraform -chdir=envs/dev init -backend-config backend.hcl
-terraform -chdir=envs/dev apply
+cp envs/dev/global/terraform.tfvars.example envs/dev/global/terraform.tfvars
+cp envs/dev/global/backend.hcl.example envs/dev/global/backend.hcl
+terraform -chdir=envs/dev/global init -backend-config backend.hcl
+terraform -chdir=envs/dev/global apply
+
+cp envs/dev/regional/terraform.tfvars.example envs/dev/regional/terraform.tfvars
+cp envs/dev/regional/backend.hcl.example envs/dev/regional/backend.hcl
+terraform -chdir=envs/dev/regional init -backend-config backend.hcl
+terraform -chdir=envs/dev/regional apply
 ```
 
 For local dev, use the dev account ID in the state key:
@@ -147,7 +171,11 @@ For local dev, use the dev account ID in the state key:
 key = "poc-001/dev/111111111111/ap-southeast-2/terraform.tfstate"
 ```
 
-The account ID keeps each developer's dev state separate while still using the same central state bucket. The region segment keeps each regional deployment in separate state.
+The account ID keeps each developer's dev state separate while still using the same central state bucket. The region segment keeps each regional deployment in separate state. The global stack uses this key shape:
+
+```hcl
+key = "poc-001/dev/111111111111/global/terraform.tfstate"
+```
 
 ## GitHub Environments
 
@@ -165,6 +193,7 @@ Set these repository variables when they are shared across environments:
 ```text
 AWS_REGIONS_JSON
 AWS_REGION
+TF_GLOBAL_REGION
 TF_STATE_BUCKET
 TF_STATE_REGION
 ```
@@ -177,32 +206,36 @@ Use `AWS_REGIONS_JSON` for multi-region deployment, for example:
 
 If `AWS_REGIONS_JSON` is unset, the deploy workflow uses `AWS_REGION`. If both are unset, it falls back to `ap-southeast-2`.
 
+Use `TF_GLOBAL_REGION` when global/shared resources must be managed from a specific AWS provider region, such as `us-east-1` for some CloudFront-related resources. If unset, it falls back to `TF_STATE_REGION`, then `AWS_REGION`, then `ap-southeast-2`.
+
 Use the role ARN output from the matching bootstrap account root. `AWS_ACCOUNT_ID` is passed to Terraform as `TF_VAR_aws_account_id`, and `TF_STATE_BUCKET` is passed to `terraform init` as backend config.
 
-Staging and production state keys are region-aware:
+Staging and production state keys are split by stack scope:
 
 ```text
+poc-001/staging/global/terraform.tfstate
 poc-001/staging/<region>/terraform.tfstate
+poc-001/prod/global/terraform.tfstate
 poc-001/prod/<region>/terraform.tfstate
 ```
 
-Pushes to `main` deploy staging first, then queue production behind the built-in `production` GitHub Environment required-reviewer gate. Production deploys all resolved regions in one approved job. After production succeeds, staging is destroyed automatically for the same resolved regions.
+Pushes to `main` deploy staging global first, then staging regional resources in a matrix. Production then deploys global first, followed by regional resources in a matrix. After production succeeds, staging regional resources are destroyed, then staging global resources are destroyed for full-region runs.
 
-Manual workflow runs can override the region to deploy only one region. Normal pushes deploy all regions from `AWS_REGIONS_JSON`, or the single `AWS_REGION` value, or `ap-southeast-2` if neither is set.
+Manual workflow runs can override the region to deploy only one regional stack. Global deploy still runs once because shared resources may be dependencies. Global destroy only runs for full environment destroys, not single-region destroys.
 
-The deploy workflow passes backend config to `terraform init` at runtime, so state bucket names and account IDs are not committed.
+The deploy workflow passes backend config to `terraform init` at runtime, so state bucket names and account IDs do not need to be committed.
 
-Pull request checks run in a separate workflow, `.github/workflows/terraform-checks.yml`, and deployment runs in `.github/workflows/terraform-deploy.yml`.
+Pull request checks run in `.github/workflows/terraform-checks.yml`. They validate all bootstrap, global, and regional roots, then run staging plans for both global and regional stacks when the pull request branch is in this repository. Pull requests from forks run validation only, so AWS OIDC credentials are not exposed to untrusted fork workflows.
 
-Pull requests from branches in this repository also run staging plans across the configured regions. Pull requests from forks run validation only, so AWS OIDC credentials are not exposed to untrusted fork workflows.
-
-Production destroy is intentionally separated into `.github/workflows/terraform-destroy-prod.yml`. It only runs manually, requires typing `destroy production`, and uses the `production` GitHub Environment required-reviewer gate.
+Production destroy is intentionally separated into `.github/workflows/terraform-destroy-prod.yml`. It only runs manually, requires typing `destroy production`, and uses the `production` GitHub Environment required-reviewer gate. It destroys regional stacks first and only destroys the production global stack when `region` is `all`.
 
 Staging and production example values are committed without real account IDs:
 
 ```text
-envs/staging/terraform.tfvars.example
-envs/prod/terraform.tfvars.example
+envs/staging/global/terraform.tfvars.example
+envs/staging/regional/terraform.tfvars.example
+envs/prod/global/terraform.tfvars.example
+envs/prod/regional/terraform.tfvars.example
 ```
 
 The state bucket can be the same bucket for all environments. If that bucket is in a separate AWS account, the bucket policy must trust the GitHub deployment roles that need to read/write Terraform state.
