@@ -252,6 +252,8 @@ key = "poc-001/dev/111111111111/global/terraform.tfstate"
 
 Create GitHub environments named `staging` and `production`.
 
+> **Recommended:** Add required reviewers to the `production` GitHub Environment. Because `.github/workflows/terraform-deploy.yml` uses `environment: production` for production jobs, this creates a manual approval gate between the staging deployment and production promotion.
+
 Set these GitHub Environment variables on `staging` and `production`:
 
 ```text
