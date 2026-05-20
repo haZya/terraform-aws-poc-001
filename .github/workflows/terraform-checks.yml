@@ -86,6 +86,7 @@ jobs:
       contents: read
       id-token: write
       issues: write
+      pull-requests: write
     env:
       TF_WORKING_DIR: envs/staging/global
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
@@ -158,6 +159,7 @@ jobs:
 
       - name: Comment Terraform plan
         if: always() && steps.plan.outcome != 'skipped'
+        continue-on-error: true
         uses: actions/github-script@v8
         env:
           PLAN_EXIT_CODE: ${{ steps.plan.outputs.exit_code }}
@@ -237,6 +239,7 @@ jobs:
       contents: read
       id-token: write
       issues: write
+      pull-requests: write
     env:
       TF_WORKING_DIR: envs/staging/regional
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
@@ -309,6 +312,7 @@ jobs:
 
       - name: Comment Terraform plan
         if: always() && steps.plan.outcome != 'skipped'
+        continue-on-error: true
         uses: actions/github-script@v8
         env:
           PLAN_EXIT_CODE: ${{ steps.plan.outputs.exit_code }}
