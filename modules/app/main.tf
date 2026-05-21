@@ -3,7 +3,8 @@ locals {
 }
 
 resource "aws_sqs_queue" "main" {
-  name = local.queue_name
+  name                       = local.queue_name
+  visibility_timeout_seconds = 99
 
   tags = {
     Name = local.queue_name
