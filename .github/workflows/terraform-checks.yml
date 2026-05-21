@@ -86,6 +86,7 @@ jobs:
       contents: read
       id-token: write
       issues: write
+      pull-requests: write
     env:
       TF_WORKING_DIR: envs/staging/global
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
@@ -158,11 +159,12 @@ jobs:
 
       - name: Comment Terraform plan
         if: always() && steps.plan.outcome != 'skipped'
+        continue-on-error: true
         uses: actions/github-script@v8
         env:
           PLAN_EXIT_CODE: ${{ steps.plan.outputs.exit_code }}
           PLAN_MARKER: '<!-- terraform-plan:staging-global -->'
-          PLAN_TITLE: Terraform Plan: Staging Global
+          PLAN_TITLE: 'Terraform Plan: Staging Global'
           TF_PLAN_OUTPUT: ${{ runner.temp }}/terraform-plan-staging-global.txt
         with:
           script: |
@@ -237,6 +239,7 @@ jobs:
       contents: read
       id-token: write
       issues: write
+      pull-requests: write
     env:
       TF_WORKING_DIR: envs/staging/regional
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
@@ -309,11 +312,12 @@ jobs:
 
       - name: Comment Terraform plan
         if: always() && steps.plan.outcome != 'skipped'
+        continue-on-error: true
         uses: actions/github-script@v8
         env:
           PLAN_EXIT_CODE: ${{ steps.plan.outputs.exit_code }}
           PLAN_MARKER: '<!-- terraform-plan:staging-regional:${{ matrix.region }} -->'
-          PLAN_TITLE: Terraform Plan: Staging Regional (${{ matrix.region }})
+          PLAN_TITLE: 'Terraform Plan: Staging Regional (${{ matrix.region }})'
           TF_PLAN_OUTPUT: ${{ runner.temp }}/terraform-plan-staging-regional-${{ matrix.region }}.txt
         with:
           script: |
